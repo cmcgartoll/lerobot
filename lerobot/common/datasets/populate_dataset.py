@@ -353,7 +353,7 @@ def encode_videos(dataset, image_keys, play_sounds):
 
     # Use ffmpeg to convert frames stored as png into mp4 videos
     for episode_index in tqdm.tqdm(range(num_episodes)):
-        for key in image_keys:
+        for key in image_keys: # TODO: Figure out how to do it here
             # key = f"observation.images.{name}"
             tmp_imgs_dir = videos_dir / f"{key}_episode_{episode_index:06d}"
             fname = f"{key}_episode_{episode_index:06d}.mp4"
