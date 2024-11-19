@@ -7,7 +7,7 @@ from pytesseract import Output
 pytesseract.pytesseract.tesseract_cmd = r'/opt/homebrew/bin/tesseract'
 
 # Load the image
-img = cv2.imread('outputs/yolo_training_images/camera_03_frame_000005.png')
+img = cv2.imread('data/cmcgartoll/banana-grama-bot/videos/observation.images.phone_episode_000000/frame_000000.png')
 
 def get_grayscale(image):
     """Convert image to grayscale."""
@@ -46,7 +46,8 @@ for c in contours:
     x, y, w, h = cv2.boundingRect(c)
     ratio = h/w
     area = w*h
-    if ratio > 0.8 and ratio < 1.2 and 12000 < area < 30000 and x <= 1150:
+    print(f"x: {x}, y: {y}, w: {w}, h: {h}, ratio: {ratio}, area: {area}")
+    if ratio > 0.6 and ratio < 1.4 and 1250 < area < 3000 and x > 400:
         print(f"x: {x}, y: {y}, w: {w}, h: {h}")
         # Get the rotated rectangle
         # Get both rectangles
@@ -94,7 +95,7 @@ for c in contours:
 
         h, w = rotated_roi.shape
         center_y, center_x = h//2, w//2
-        crop_size = 110
+        crop_size = 35
 
         # Calculate crop coordinates (centered)
         x_start = center_x - crop_size//2
@@ -105,8 +106,8 @@ for c in contours:
 
         # Verify size
         print(f"Final tile shape: {final_tile.shape}")
-        # cv2.imshow("110x110 tile", final_tile)
-        # cv2.waitKey(-1)
+        cv2.imshow("final_tile", final_tile)
+        cv2.waitKey(-1)
         
         # cv2.imwrite(f'outputs/tests/rotated_segment_{x}_{y}.png', rotated_roi)
         # Try all 4 rotations (0, 90, 180, 270 degrees) until valid letter found

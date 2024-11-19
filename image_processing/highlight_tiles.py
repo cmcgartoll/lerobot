@@ -7,9 +7,6 @@ import argparse
 # Set Tesseract path
 pytesseract.pytesseract.tesseract_cmd = r'/opt/homebrew/bin/tesseract'
 
-# Load the image
-img = cv2.imread('outputs/yolo_training_images/camera_03_frame_000005.png')
-
 def get_grayscale(image):
     """Convert image to grayscale."""
     return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -22,41 +19,44 @@ def canny(image):
     """Apply Canny edge detection."""
     return cv2.Canny(image, 100, 200)
 
-def resize(image):
+def resize(image, scaling_factor):
     """Resize the image for better resolution."""
-    return cv2.resize(image, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
+    return cv2.resize(image, None, fx=scaling_factor, fy=scaling_factor, interpolation=cv2.INTER_LINEAR)
 
 def denoise(image):
     """Denoise the image using Non-Local Means."""
     return cv2.fastNlMeansDenoising(image, None, h=30, templateWindowSize=7, searchWindowSize=21)
 
 def highlight_letter_and_end_location(img, orig_letter, end_location):
+    scaling_factor = 2
     # Apply preprocessing
     gray = get_grayscale(img)        # Convert to grayscale
     gray_denoised = denoise(gray)           # Denoise the grayscale image
-    scaled = resize(gray_denoised)          # Resize the denoised grayscale image
+    scaled = resize(gray_denoised, scaling_factor)          # Resize the denoised grayscale image
+    thresh = thresholding(scaled) 
     canny_img = canny(scaled)
+    # cv2.imshow("canny_img", canny_img)
+    # cv2.waitKey(0)
     items = cv2.findContours(canny_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = items[0] if len(items) == 2 else items[1]
-    \
-    
-    img_copy = resize(img).copy()
+    img_copy = resize(img, scaling_factor).copy()
     letter_found = False
     end_location_found = False
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
         ratio = h/w
         area = w*h
-        if ratio > 0.8 and ratio < 1.2 and 12000 < area < 30000 and x > 1200 and not letter_found:
+        
+        if ratio > 0.8 and ratio < 1.2 and 1250 < area < 3000 and x > 400 and not letter_found:
 
-            if highlight_letter(c, orig_letter, img_copy):
+            if highlight_letter(c, orig_letter, img_copy, thresh):
                 letter_found = True
-        if ratio > 0.8 and ratio < 1.2 and 12000 < area < 30000 and x <= 1200 and not end_location_found:
+        if ratio > 0.8 and ratio < 1.2 and 1250 < area < 3000 and x <= 400 and not end_location_found:
             if highlight_end_location(c, end_location, img_copy):
                 end_location_found = True
     return img_copy
 
-def highlight_letter(c, orig_letter, img_copy):
+def highlight_letter(c, orig_letter, img_copy, thresh):
     min_rect = cv2.minAreaRect(c)  # Returns ((x,y), (width,height), angle)
     # Extract ROI using minAreaRect
     box = cv2.boxPoints(min_rect)
@@ -74,7 +74,7 @@ def highlight_letter(c, orig_letter, img_copy):
         # Rotate box points to match desired orientation
         box = np.roll(box, 1, axis=0)
     # Extract region
-    roi = img_copy[y_min:y_max, x_min:x_max]
+    roi = thresh[y_min:y_max, x_min:x_max]
 
     # Rotate ROI
     center = (roi.shape[1] // 2, roi.shape[0] // 2)
@@ -82,7 +82,7 @@ def highlight_letter(c, orig_letter, img_copy):
     rotated_roi = cv2.warpAffine(roi, matrix, (roi.shape[1], roi.shape[0]))
     h, w = rotated_roi.shape[:2]
     center_y, center_x = h//2, w//2
-    crop_size = 110
+    crop_size = 35
 
     # Calculate crop coordinates (centered)
     x_start = center_x - crop_size//2
@@ -90,6 +90,8 @@ def highlight_letter(c, orig_letter, img_copy):
 
     # Crop exactly crop_size x crop_size from center
     final_tile = rotated_roi[y_start:y_start+crop_size, x_start:x_start+crop_size]
+    # cv2.ims how("final_tile", final_tile)
+    # cv2.waitKey(0)
 
     # Try all 4 rotations (0, 90, 180, 270 degrees) until valid letter found
     best_angle = -1
@@ -150,11 +152,11 @@ def highlight_letter(c, orig_letter, img_copy):
 def highlight_end_location(c, end_location, img_copy):
     min_rect = cv2.minAreaRect(c)  # Returns ((x,y), (width,height), angle)
     _,y = min_rect[0]
-    if (end_location == 1 and y < 1976 and y >= 1746) or \
-       (end_location == 2 and y < 1746 and y >= 1516) or \
-       (end_location == 3 and y < 1516 and y >= 1286) or \
-       (end_location == 4 and y < 1286 and y >= 1056) or \
-       (end_location == 5 and y < 1056 and y >= 826):
+    if (end_location == 1 and y < 795 and y >= 715) or \
+       (end_location == 2 and y < 715 and y >= 635) or \
+       (end_location == 3 and y < 635 and y >= 555) or \
+       (end_location == 4 and y < 555 and y >= 475) or \
+       (end_location == 5 and y < 475 and y >= 395):
         # Extract ROI using minAreaRect
         box = cv2.boxPoints(min_rect)
         box = np.intp(box)
@@ -199,12 +201,12 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    for frame in range(5, 6):
+    for frame in range(args.num_frames):
         print(f"Processing frame {frame:06d}")
-        img = cv2.imread(f"{args.folder}/camera_03_frame_{frame:06d}.png")
+        img = cv2.imread(f"{args.folder}/frame_{frame:06d}.png")
         new_img = highlight_letter_and_end_location(img, args.letter, args.end_location)
         if new_img is None:
             print(f"Did not find letter {args.letter}, manually check")
             continue
-        cv2.imwrite(f"outputs/transformed_images/camera_03_frame_{frame:06d}_{args.letter}_{args.end_location}.png", new_img)
+        cv2.imwrite(f"outputs/transformed_images/frame_{frame:06d}_{args.letter}_{args.end_location}.png", new_img)
 
