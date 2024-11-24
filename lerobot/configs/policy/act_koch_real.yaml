@@ -14,7 +14,7 @@
 # ```
 
 seed: 1000
-dataset_repo_id: lerobot/koch_pick_place_lego
+dataset_repo_id: cmcgartoll/banana-grama-bot
 
 override_dataset_stats:
   observation.images.laptop:
