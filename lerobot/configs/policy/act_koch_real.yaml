@@ -17,11 +17,15 @@ seed: 1000
 dataset_repo_id: cmcgartoll/banana-grama-bot
 
 override_dataset_stats:
-  observation.images.laptop:
+  observation.images.front:
     # stats from imagenet, since we use a pretrained vision model
     mean: [[[0.485]], [[0.456]], [[0.406]]]  # (c,1,1)
     std: [[[0.229]], [[0.224]], [[0.225]]]  # (c,1,1)
   observation.images.phone:
+    # stats from imagenet, since we use a pretrained vision model
+    mean: [[[0.485]], [[0.456]], [[0.406]]]  # (c,1,1)
+    std: [[[0.229]], [[0.224]], [[0.225]]]  # (c,1,1)
+  observation.images.claw:
     # stats from imagenet, since we use a pretrained vision model
     mean: [[[0.485]], [[0.456]], [[0.406]]]  # (c,1,1)
     std: [[[0.229]], [[0.224]], [[0.225]]]  # (c,1,1)
@@ -59,16 +63,18 @@ policy:
 
   input_shapes:
     # TODO(rcadene, alexander-soare): add variables for height and width from the dataset/env?
-    observation.images.laptop: [3, 480, 640]
+    observation.images.front: [3, 480, 640]
     observation.images.phone: [3, 480, 640]
+    observation.images.claw: [3, 480, 640]
     observation.state: ["${env.state_dim}"]
   output_shapes:
     action: ["${env.action_dim}"]
 
   # Normalization / Unnormalization
   input_normalization_modes:
-    observation.images.laptop: mean_std
+    observation.images.front: mean_std
     observation.images.phone: mean_std
+    observation.images.claw: mean_std
     observation.state: mean_std
   output_normalization_modes:
     action: mean_std
