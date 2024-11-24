@@ -103,6 +103,7 @@ import logging
 import time
 from pathlib import Path
 from typing import List
+import json
 
 # from safetensors.torch import load_file, save_file
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
@@ -263,12 +264,54 @@ def record(
     if has_method(robot, "teleop_safety_stop"):
         robot.teleop_safety_stop()
 
+    # Initialize episodes list in dataset if it doesn't exist
+    if "episodes" not in dataset:
+        dataset["episodes"] = []
+
     while True:
         if dataset["num_episodes"] >= num_episodes:
             break
 
         episode_index = dataset["num_episodes"]
-        log_say(f"Recording episode {episode_index}", play_sounds)
+        
+        # Get user input for letter and end location before each episode
+        while True:
+            letter = input("Enter the letter to track (A-Z): ").upper()
+            if len(letter) == 1 and letter.isalpha():
+                break
+            print("Please enter a single letter (A-Z)")
+            
+        while True:
+            try:
+                end_location = int(input("Enter the end location (1-5): "))
+                if 1 <= end_location <= 5:
+                    break
+                print("Please enter a number between 1 and 5")
+            except ValueError:
+                print("Please enter a valid number")
+        
+        # Store these values in a JSON file in the meta_data directory
+        video_dir = dataset["local_dir"] / "videos"
+        video_dir.mkdir(exist_ok=True)
+        metadata_file = video_dir / "episode_image_processing_info.json"
+        
+        try:
+            with open(metadata_file, 'r') as f:
+                metadata = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            # Create empty metadata dictionary if file doesn't exist or is empty
+            metadata = {}
+
+        metadata[str(episode_index)] = {
+            "letter": letter,
+            "end_location": end_location
+        }
+        
+        with open(metadata_file, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        log_say(f"Recording episode {episode_index} - Tracking letter {letter} to position {end_location}", play_sounds)
+        
         record_episode(
             dataset=dataset,
             robot=robot,

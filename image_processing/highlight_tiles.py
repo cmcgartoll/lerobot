@@ -27,6 +27,23 @@ def denoise(image):
     """Denoise the image using Non-Local Means."""
     return cv2.fastNlMeansDenoising(image, None, h=30, templateWindowSize=7, searchWindowSize=21)
 
+def process_image(img_path, orig_letter, end_location):
+    img = cv2.imread(img_path)
+    if img is None:
+        print(f"Failed to read image at {img_path}")
+        return False
+    try:
+        processed_img = highlight_letter_and_end_location(img, orig_letter, end_location)
+        if processed_img is not None:
+            cv2.imwrite(img_path, processed_img)
+            return True
+        else:
+            print(f"Failed to process image {img_path}: highlight_letter_and_end_location returned None")
+            return False
+    except Exception as e:
+        print(f"Error processing image {img_path}: {str(e)}")
+        return False
+
 def highlight_letter_and_end_location(img, orig_letter, end_location):
     scaling_factor = 2
     # Apply preprocessing
@@ -49,14 +66,15 @@ def highlight_letter_and_end_location(img, orig_letter, end_location):
         
         if ratio > 0.8 and ratio < 1.2 and 1250 < area < 3000 and x > 400 and not letter_found:
 
-            if highlight_letter(c, orig_letter, img_copy, thresh):
+            if highlight_letter(c, orig_letter, img_copy, thresh, img):
                 letter_found = True
         if ratio > 0.8 and ratio < 1.2 and 1250 < area < 3000 and x <= 400 and not end_location_found:
             if highlight_end_location(c, end_location, img_copy):
                 end_location_found = True
+    img_copy = cv2.resize(img_copy, (img.shape[1], img.shape[0]))
     return img_copy
 
-def highlight_letter(c, orig_letter, img_copy, thresh):
+def highlight_letter(c, orig_letter, img_copy, thresh, img):
     min_rect = cv2.minAreaRect(c)  # Returns ((x,y), (width,height), angle)
     # Extract ROI using minAreaRect
     box = cv2.boxPoints(min_rect)
@@ -143,8 +161,6 @@ def highlight_letter(c, orig_letter, img_copy, thresh):
         # Fill polygons directly on img_copy without transparency
         cv2.fillPoly(img_copy, [top_half], (0, 0, 255))  # Red
         cv2.fillPoly(img_copy, [bottom_half], (0, 255, 0))  # Green
-        # Scale back down to original size
-        img_copy = cv2.resize(img_copy, (img.shape[1], img.shape[0]))
         return True
     return False
 
@@ -208,5 +224,5 @@ if __name__ == "__main__":
         if new_img is None:
             print(f"Did not find letter {args.letter}, manually check")
             continue
-        cv2.imwrite(f"outputs/transformed_images/frame_{frame:06d}_{args.letter}_{args.end_location}.png", new_img)
+        cv2.imwrite(f"outputs/transformed_images/{args.folder.split('/')[-1]}_frame_{frame:06d}_{args.letter}_{args.end_location}.png", new_img)
 

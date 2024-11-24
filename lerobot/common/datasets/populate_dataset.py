@@ -5,9 +5,10 @@ import concurrent
 import json
 import logging
 import multiprocessing
+from multiprocessing import Pool
 import shutil
 from pathlib import Path
-
+from functools import partial
 import torch
 import tqdm
 from PIL import Image
@@ -25,6 +26,10 @@ from lerobot.scripts.push_dataset_to_hub import (
     push_videos_to_hub,
     save_meta_data,
 )
+########################################################################################
+# Image processing
+########################################################################################
+from image_processing.highlight_tiles import process_image
 
 ########################################################################################
 # Asynchrounous saving of images on disk
@@ -306,7 +311,9 @@ def delete_current_episode(dataset):
     # delete temporary images
     episode_index = dataset["num_episodes"]
     videos_dir = dataset["videos_dir"]
+    print(f"Deleting episode {episode_index}, {videos_dir} /*_episode_{episode_index:06d}")
     for tmp_imgs_dir in videos_dir.glob(f"*_episode_{episode_index:06d}"):
+        print(f"Deleting {tmp_imgs_dir}")
         shutil.rmtree(tmp_imgs_dir)
 
 
@@ -342,6 +349,11 @@ def save_current_episode(dataset):
 
     dataset["num_episodes"] += 1
 
+def process_frame(frame_idx, tmp_imgs_dir, letter, end_location):
+    frame_path = tmp_imgs_dir / f"frame_{frame_idx:06d}.png"
+    if frame_path.exists():
+        img_path = str(frame_path)
+        process_image(img_path, letter, end_location)
 
 def encode_videos(dataset, image_keys, play_sounds):
     log_say("Encoding videos", play_sounds)
@@ -350,21 +362,48 @@ def encode_videos(dataset, image_keys, play_sounds):
     videos_dir = dataset["videos_dir"]
     local_dir = dataset["local_dir"]
     fps = dataset["fps"]
+    
+    # Load episode metadata from meta_data directory
+    metadata_file = local_dir / "videos" / "episode_image_processing_info.json"
+    if not metadata_file.exists():
+        raise FileNotFoundError(f"Episode metadata file not found: {metadata_file}")
+    with open(metadata_file, 'r') as f:
+        episode_metadata = json.load(f)
 
     # Use ffmpeg to convert frames stored as png into mp4 videos
     for episode_index in tqdm.tqdm(range(num_episodes)):
-        for key in image_keys: # TODO: Figure out how to do it here
-            # key = f"observation.images.{name}"
+        # Get metadata for this episode
+        episode_data = episode_metadata[str(episode_index)]
+        letter = episode_data["letter"]
+        end_location = episode_data["end_location"]
+        
+        for key in image_keys:
             tmp_imgs_dir = videos_dir / f"{key}_episode_{episode_index:06d}"
             fname = f"{key}_episode_{episode_index:06d}.mp4"
             video_path = local_dir / "videos" / fname
             if video_path.exists():
-                # Skip if video is already encoded. Could be the case when resuming data recording.
                 continue
-            # note: `encode_video_frames` is a blocking call. Making it asynchronous shouldn't speedup encoding,
-            # since video encoding with ffmpeg is already using multithreading.
-            # encode_video_frames(tmp_imgs_dir, video_path, fps, overwrite=True)
-            # shutil.rmtree(tmp_imgs_dir)
+
+            if "phone" in key:  # Special processing for phone camera images
+                # Process first X frames with highlight_tiles
+                num_frames_to_process = 150  # Adjust this number as needed
+                
+                # Create a partial function with fixed arguments
+                process_frame_partial = partial(
+                    process_frame,
+                    tmp_imgs_dir=tmp_imgs_dir,
+                    letter=letter,
+                    end_location=end_location
+                )
+                
+                # Use all available CPU cores (you can adjust the number if needed)
+                with Pool() as pool:
+                    # Process frames in parallel
+                    pool.map(process_frame_partial, range(num_frames_to_process))
+
+            # Encode video for all keys
+            encode_video_frames(tmp_imgs_dir, video_path, fps, overwrite=True)
+            shutil.rmtree(tmp_imgs_dir)
 
 
 def from_dataset_to_lerobot_dataset(dataset, play_sounds):
