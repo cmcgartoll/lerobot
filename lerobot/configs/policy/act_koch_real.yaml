@@ -12,7 +12,7 @@
 #   policy=act_koch_real \
 #   env=koch_real
 # ```
-
+resume: false
 seed: 1000
 dataset_repo_id: cmcgartoll/banana-grama-bot
 
