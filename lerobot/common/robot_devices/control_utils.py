@@ -21,6 +21,7 @@ from lerobot.common.robot_devices.robots.utils import Robot
 from lerobot.common.robot_devices.utils import busy_wait
 from lerobot.common.utils.utils import get_safe_torch_device, init_hydra_config, set_global_seed
 from lerobot.scripts.eval import get_pretrained_policy_path
+from image_processing.highlight_tiles import process_image
 
 
 def log_control_info(robot: Robot, dt_s, episode_index=None, frame_index=None, fps=None):
@@ -206,6 +207,8 @@ def record_episode(
     device,
     use_amp,
     fps,
+    letter,
+    end_location,
 ):
     control_loop(
         robot=robot,
@@ -218,6 +221,8 @@ def record_episode(
         use_amp=use_amp,
         fps=fps,
         teleoperate=policy is None,
+        letter=letter,
+        end_location=end_location,
     )
 
 
@@ -233,7 +238,21 @@ def control_loop(
     device=None,
     use_amp=None,
     fps=None,
+    letter=None,
+    end_location=None,
 ):
+    # Add image processing imports
+    from image_processing.highlight_tiles import process_image
+    import cv2
+    import logging
+    
+    # Initialize variables
+    frame_count = 0
+    processed_img = None
+    processed_rgb_tensor = None
+    max_frames = 150
+    camera_name = 'phone'
+    
     # TODO(rcadene): Add option to record logs
     if not robot.is_connected:
         robot.connect()
@@ -259,11 +278,38 @@ def control_loop(
             observation, action = robot.teleop_step(record_data=True)
         else:
             observation = robot.capture_observation()
+            
+            # Handle first 150 frames
+            if frame_count < max_frames:
+                if f"observation.images.{camera_name}" in observation:
+                    if processed_img is None:
+                        # Only process new image if we haven't found a valid one yet
+                        img = observation[f"observation.images.{camera_name}"].numpy()
+                        # Convert from RGB to BGR for OpenCV
+                        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                        
+                        # Process image directly
+                        success, new_processed_img = process_image(
+                            img_input=img,
+                            orig_letter=letter,
+                            end_location=end_location
+                        )
+                        
+                        if success:
+                            processed_img = new_processed_img
+                            # Convert BGR back to RGB and cache the tensor
+                            processed_rgb = cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB)
+                            processed_rgb_tensor = torch.from_numpy(processed_rgb)
+                            # logging.info(f"Successfully processed frame {frame_count}")
+                    
+                    # Always update observation with processed_rgb_tensor if it exists
+                    if processed_rgb_tensor is not None:
+                        observation[f"observation.images.{camera_name}"] = processed_rgb_tensor
+                
+                frame_count += 1
 
             if policy is not None:
                 pred_action = predict_action(observation, policy, device, use_amp)
-                # Action can eventually be clipped using `max_relative_target`,
-                # so action actually sent is saved in the dataset.
                 action = robot.send_action(pred_action)
                 action = {"action": action}
 

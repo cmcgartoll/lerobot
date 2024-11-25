@@ -25,6 +25,7 @@ from lerobot.scripts.push_dataset_to_hub import (
     push_meta_data_to_hub,
     push_videos_to_hub,
     save_meta_data,
+    push_train_data_to_hub
 )
 ########################################################################################
 # Image processing
@@ -470,6 +471,7 @@ def push_lerobot_dataset_to_hub(lerobot_dataset, tags):
     repo_id = lerobot_dataset.repo_id
     video = lerobot_dataset.video
     meta_data_dir = local_dir / "meta_data"
+    train_data_dir = local_dir / "train"
 
     if not (local_dir / "train").exists():
         raise ValueError(
@@ -477,6 +479,7 @@ def push_lerobot_dataset_to_hub(lerobot_dataset, tags):
         )
 
     hf_dataset.push_to_hub(repo_id, revision="main")
+    push_train_data_to_hub(repo_id, train_data_dir, revision="main")
     push_meta_data_to_hub(repo_id, meta_data_dir, revision="main")
     push_dataset_card_to_hub(repo_id, revision="main", tags=tags)
     if video:

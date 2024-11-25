@@ -115,6 +115,16 @@ def push_meta_data_to_hub(repo_id: str, meta_data_dir: str | Path, revision: str
         repo_type="dataset",
     )
 
+def push_train_data_to_hub(repo_id: str, train_data_dir: str | Path, revision: str | None):
+    api = HfApi()
+    api.upload_folder(
+        folder_path=train_data_dir,
+        path_in_repo="train",
+        repo_id=repo_id,
+        revision=revision,
+        repo_type="dataset",
+    )
+
 
 def push_dataset_card_to_hub(
     repo_id: str, revision: str | None, tags: list | None = None, text: str | None = None

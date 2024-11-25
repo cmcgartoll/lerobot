@@ -45,7 +45,9 @@ def get_safe_torch_device(cfg_device: str, log: bool = False) -> torch.device:
     """Given a string, return a torch.device with checks on whether the device is available."""
     match cfg_device:
         case "cuda":
-            assert torch.cuda.is_available()
+            if not torch.cuda.is_available():
+                logging.warning("CUDA requested but not available. Falling back to CPU.")
+                return torch.device("cpu")
             device = torch.device("cuda")
         case "mps":
             assert torch.backends.mps.is_available()

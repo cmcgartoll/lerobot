@@ -27,22 +27,38 @@ def denoise(image):
     """Denoise the image using Non-Local Means."""
     return cv2.fastNlMeansDenoising(image, None, h=30, templateWindowSize=7, searchWindowSize=21)
 
-def process_image(img_path, orig_letter, end_location):
-    img = cv2.imread(img_path)
-    if img is None:
-        print(f"Failed to read image at {img_path}")
-        return False
+def process_image(img_input, orig_letter, end_location):
+    """Process an image to highlight letters and locations.
+    
+    Args:
+        img_input: Either a string path to an image or a numpy array in BGR format
+        orig_letter: The letter to highlight
+        end_location: The target location to highlight
+    
+    Returns:
+        bool: True if processing succeeded, False otherwise
+        numpy.ndarray: The processed image if successful, None otherwise
+    """
+    if isinstance(img_input, str):
+        img = cv2.imread(img_input)
+        if img is None:
+            print(f"Failed to read image at {img_input}")
+            return False, None
+    else:
+        img = img_input  # Already a numpy array
+
     try:
         processed_img = highlight_letter_and_end_location(img, orig_letter, end_location)
         if processed_img is not None:
-            cv2.imwrite(img_path, processed_img)
-            return True
+            if isinstance(img_input, str):
+                cv2.imwrite(img_input, processed_img)
+            return True, processed_img
         else:
-            print(f"Failed to process image {img_path}: highlight_letter_and_end_location returned None")
-            return False
+            print(f"Failed to process image: highlight_letter_and_end_location returned None")
+            return False, None
     except Exception as e:
-        print(f"Error processing image {img_path}: {str(e)}")
-        return False
+        print(f"Error processing image: {str(e)}")
+        return False, None
 
 def highlight_letter_and_end_location(img, orig_letter, end_location):
     scaling_factor = 2
