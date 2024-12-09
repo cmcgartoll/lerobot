@@ -48,8 +48,8 @@ def process_image(img_input, orig_letter, end_location):
         img = img_input  # Already a numpy array
 
     try:
-        processed_img = highlight_letter_and_end_location(img, orig_letter, end_location)
-        if processed_img is not None:
+        processed_img, success = highlight_letter_and_end_location(img, orig_letter, end_location)
+        if processed_img is not None and success:
             if isinstance(img_input, str):
                 cv2.imwrite(img_input, processed_img)
             return True, processed_img
@@ -88,7 +88,7 @@ def highlight_letter_and_end_location(img, orig_letter, end_location):
             if highlight_end_location(c, end_location, img_copy):
                 end_location_found = True
     img_copy = cv2.resize(img_copy, (img.shape[1], img.shape[0]))
-    return img_copy
+    return img_copy, letter_found and end_location_found
 
 def highlight_letter(c, orig_letter, img_copy, thresh, img):
     min_rect = cv2.minAreaRect(c)  # Returns ((x,y), (width,height), angle)

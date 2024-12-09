@@ -251,6 +251,7 @@ def control_loop(
     processed_img = None
     processed_rgb_tensor = None
     max_frames = 150
+    starting_frame = 5
     camera_name = 'phone'
     
     # TODO(rcadene): Add option to record logs
@@ -277,6 +278,7 @@ def control_loop(
         if teleoperate:
             observation, action = robot.teleop_step(record_data=True)
         else:
+            print(teleoperate)
             observation = robot.capture_observation()
             
             # Handle first 150 frames

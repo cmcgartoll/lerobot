@@ -384,8 +384,8 @@ def encode_videos(dataset, image_keys, play_sounds):
             video_path = local_dir / "videos" / fname
             if video_path.exists():
                 continue
-
-            if "phone" in key:  # Special processing for phone camera images
+            if "eval" not in str(local_dir) and "phone" in key:  # Special processing for phone camera images
+                breakpoint()
                 # Process first X frames with highlight_tiles
                 num_frames_to_process = 150  # Adjust this number as needed
                 
@@ -417,11 +417,32 @@ def from_dataset_to_lerobot_dataset(dataset, play_sounds):
     fps = dataset["fps"]
     repo_id = dataset["repo_id"]
 
+    # Get all episode files and sort them
+    episode_files = sorted(episodes_dir.glob("episode_*.pth"), 
+                         key=lambda x: int(x.stem.split('_')[1]))
+    
+    # Reindex episodes and update video paths
     ep_dicts = []
-    for episode_index in tqdm.tqdm(range(num_episodes)):
-        ep_path = episodes_dir / f"episode_{episode_index}.pth"
-        ep_dict = torch.load(ep_path)
-        ep_dicts.append(ep_dict)
+    for new_index, ep_path in enumerate(episode_files):
+        if ep_path.exists():
+            ep_dict = torch.load(ep_path)
+            
+            # Update episode index in the dictionary
+            ep_dict["episode_index"] = torch.full_like(ep_dict["episode_index"], new_index)
+            
+            # Update video paths for all image keys
+            for key in ep_dict:
+                if "image" in key:
+                    # Update video path to match the actual file
+                    fname = f"{key}_episode_{new_index:06d}.mp4"
+                    for i in range(len(ep_dict[key])):
+                        ep_dict[key][i] = {"path": f"videos/{fname}", "timestamp": i / fps}
+            
+            ep_dicts.append(ep_dict)
+        else:
+            logging.warning(f"Missing episode file: {ep_path}")
+    
+    num_episodes = len(ep_dicts)  # Update num_episodes to match reality
     data_dict = concatenate_episodes(ep_dicts)
 
     if video:
@@ -429,6 +450,14 @@ def from_dataset_to_lerobot_dataset(dataset, play_sounds):
         encode_videos(dataset, image_keys, play_sounds)
 
     hf_dataset = to_hf_dataset(data_dict, video)
+    
+    # Verify the episode count matches
+    print(f"hf_dataset.unique('episode_index'): {hf_dataset.unique('episode_index')}")
+    if len(hf_dataset.unique("episode_index")) != num_episodes:
+        logging.warning("Filtering dataset to match actual episodes")
+        max_episode = num_episodes - 1
+        hf_dataset = hf_dataset.filter(lambda x: x["episode_index"] <= max_episode)
+
     episode_data_index = calculate_episode_data_index(hf_dataset)
 
     info = {

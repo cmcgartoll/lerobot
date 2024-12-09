@@ -283,6 +283,8 @@ def record(
         except (FileNotFoundError, json.JSONDecodeError):
             # Create empty metadata dictionary if file doesn't exist or is empty
             metadata = {}
+        if str(episode_index) not in metadata:
+            metadata[str(episode_index)] = {}
         if not metadata[str(episode_index)]:
             # Get user input for letter and end location before each episode
             while True:
